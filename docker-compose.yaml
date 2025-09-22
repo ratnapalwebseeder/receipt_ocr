@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    container_name: receipt-ocr-api
+    network_mode: "host"
+    env_file:
+      - prod.env
+    restart: unless-stopped

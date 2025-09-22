@@ -1,9 +1,11 @@
 import json
 import re
+import os
 
 import requests
 from imgocr import ImgOcr
 
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434/api/generate")
 
 def ocr_image(image_path: str):
     """Extract text from receipt image using ImgOcr."""
@@ -70,7 +72,7 @@ def extract_receipt(receipt_text: str):
 
     try:
         response = requests.post(
-            "http://localhost:11434/api/generate",
+            f"{OLLAMA_HOST}/api/generate",
             json={
                 "model": "granite3.3:latest",
                 "prompt": prompt,

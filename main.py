@@ -2,8 +2,8 @@ import asyncio
 import logging
 import os
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 
 from services import extract_receipt, ocr_image
 
@@ -15,9 +15,7 @@ logging.basicConfig(
 
 logger = logging.getLogger("receipt_ocr")
 
-load_dotenv()  # Load .env file
-API_KEY = os.getenv("RECEIPT_API_KEY")  # Get API key from .env file
-API_KEY = '123'
+API_KEY = os.environ.get("API_KEY")  # Get API key from .env file
 
 app = FastAPI()
 
@@ -26,10 +24,28 @@ def verify_api_key(api_key: str):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 # Health check
-@app.get("/")
-def home():
-    return {"message": "Receipt OCR API is running!"}
-
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Backend Status</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
+                h1 { color: #2c3e50; }
+                a { text-decoration: none; color: white; background-color: #007BFF; padding: 10px 20px; border-radius: 5px; }
+                a:hover { background-color: #0056b3; }
+            </style>
+        </head>
+        <body>
+            <h1>🚀 Everything is working!</h1>
+            <p>Welcome to the Python World</p>
+            <a href="/docs">Go to API Docs</a>
+        </body>
+    </html>
+    """
+    return html_content
 
 @app.post("/process-receipt")
 async def process_receipt(

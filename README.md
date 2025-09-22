@@ -29,7 +29,7 @@ The entire process runs asynchronously, allowing the API to handle multiple requ
 
 1. **Clone the repository**:
 ```bash
-git clone <repository-url>
+git clone https://github.com/ratnapalwebseeder/receipt_ocr.git
 cd receipt-ocr
 ```
 

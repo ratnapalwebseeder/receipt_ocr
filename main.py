@@ -1,53 +1,24 @@
 import asyncio
 import logging
 import os
-import uuid
-import shutil
-
+import tempfile
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
-
 from services import extract_receipt, ocr_image
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("receipt_ocr")
 
-API_KEY = os.environ.get("API_KEY")  # Get API key from .env file
-
+API_KEY = os.environ.get("API_KEY")
 app = FastAPI()
 
 def verify_api_key(api_key: str):
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-# Health check
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <title>Backend Status</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
-                h1 { color: #2c3e50; }
-                a { text-decoration: none; color: white; background-color: #007BFF; padding: 10px 20px; border-radius: 5px; }
-                a:hover { background-color: #0056b3; }
-            </style>
-        </head>
-        <body>
-            <h1>🚀 Everything is working!</h1>
-            <p>Welcome to the Python World</p>
-            <a href="/docs">Go to API Docs</a>
-        </body>
-    </html>
-    """
-    return html_content
+    return "<h1>🚀 OCR Service is Running</h1>"
 
 @app.post("/process-receipt")
 async def process_receipt(
@@ -58,15 +29,29 @@ async def process_receipt(
     verify_api_key(api_key)
 
     if not file.content_type.startswith("image/"):
-        logger.warning(f"Uploaded File is not an image: {file.filename.rsplit(".")}")
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    file_bytes = await file.read()
+    # STEP 1: Save bytes to a temporary file path
+    # ImgOcr requires a physical file path string.
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
 
-    loop = asyncio.get_event_loop()
-    ocr_text = await loop.run_in_executor(None, ocr_image, file_bytes)
+    try:
+        # STEP 2: Pass the PATH to the OCR function
+        loop = asyncio.get_event_loop()
+        ocr_text = await loop.run_in_executor(None, ocr_image, tmp_path)
 
-    extracted_data = extract_receipt(ocr_text)
-    return extracted_data
+        # STEP 3: Extract and Return
+        extracted_data = extract_receipt(ocr_text)
+        return extracted_data
 
-
+    except Exception as e:
+        logger.error(f"Processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    finally:
+        # STEP 4: Clean up the file so the server doesn't get full
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)

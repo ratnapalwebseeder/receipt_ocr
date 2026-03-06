@@ -54,19 +54,28 @@ async def process_receipt(
     file: UploadFile = File(...),
     api_key: str = Header(..., alias="api-key")
 ):
-    logger.info(f"Received request for file: {file.filename}")
     verify_api_key(api_key)
+    
+    temp_path = f"temp_{uuid.uuid4()}.jpg"
+    try:
+        # 1. Reset file pointer to the beginning
+        await file.seek(0) 
+        
+        # 2. Write the content manually to ensure it's fully flushed to disk
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+            
+        with open(temp_path, "wb") as f:
+            f.write(content)
 
-    if not file.content_type.startswith("image/"):
-        logger.warning(f"Uploaded File is not an image: {file.filename.rsplit(".")}")
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    file_bytes = await file.read()
-
-    loop = asyncio.get_event_loop()
-    ocr_text = await loop.run_in_executor(None, ocr_image, file_bytes)
-
-    extracted_data = extract_receipt(ocr_text)
-    return extracted_data
+        # 3. Run OCR
+        loop = asyncio.get_event_loop()
+        ocr_text = await loop.run_in_executor(None, ocr_image, temp_path)
+        
+        return extract_receipt(ocr_text)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
